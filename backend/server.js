@@ -2,7 +2,9 @@ const express = require("express");
 const cors = require("cors");
 const http = require("http");
 const { Server } = require("socket.io");
-
+const Message = require("./models/Message");
+const Conversation = require("./models/Coversation");
+const jwt = require("jsonwebtoken");
 require("dotenv").config();
 
 const connectDb = require("./config/db");
@@ -43,8 +45,66 @@ app.get("/", (req, res) => {
 });
 
 // Socket.io
+
+io.use((socket, next) => {
+  try {
+    const token = socket.handshake.auth.token;
+
+    console.log("Token received:", !!token);
+    console.log("JWT_SECRET exists:", !!process.env.JWT_SECRET);
+
+    if (!token) {
+      return next(new Error("Authentication required"));
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    console.log("Authenticated user:", decoded.userId);
+
+    socket.userId = decoded.userId;
+
+    next();
+  } catch (error) {
+    console.log("JWT ERROR NAME:", error.name);
+    console.log("JWT ERROR MESSAGE:", error.message);
+
+    next(new Error("Invalid or expired token"));
+  }
+});
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
+
+  socket.on("joinConversation", (conversationId) => {
+    socket.join(conversationId);
+
+    console.log(`${socket.id} joined conversation ${conversationId}`);
+  });
+
+  socket.on("sendMessage", async (data) => {
+    try {
+      const { conversationId, text } = data;
+      const senderId = socket.userId;
+      if (!conversationId || !text) {
+        return;
+      }
+      const message = await Message.create({
+        conversationId,
+        sender: senderId,
+        text,
+      });
+      await Conversation.findByIdAndUpdate(conversationId, {
+        lastMessage: message._id,
+      });
+
+      const populateMessage = await Message.findById(message._id).populate(
+        "sender",
+        "name email profileImage",
+      );
+      io.to(conversationId).emit("receiverMessage", populateMessage);
+    } catch (error) {
+      console.log("Socket message error:", error.message);
+    }
+  });
 
   socket.on("disconnect", () => {
     console.log("User disconnected:", socket.id);
