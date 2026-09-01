@@ -57,6 +57,53 @@ const sendMessage = async (req, res) => {
   }
 };
 
+const getMessages = async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const userId = req.userId;
+
+    // Check conversation exists
+    const conversation = await Conversation.findById(conversationId);
+
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: "Conversation not found",
+      });
+    }
+
+    // Check user belongs to conversation
+    const isMember = conversation.members.some(
+      (member) => member.toString() === userId.toString(),
+    );
+
+    if (!isMember) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not a member of this conversation",
+      });
+    }
+
+    const messages = await Message.find({
+      conversationId,
+    })
+      .populate("sender", "name email profileImage")
+      .sort({ createdAt: 1 });
+
+    res.status(200).json({
+      success: true,
+      message: "Messages fetched successfully",
+      data: messages,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 module.exports = {
   sendMessage,
+  getMessages,
 };
