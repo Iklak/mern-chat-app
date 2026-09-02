@@ -1,25 +1,22 @@
-import { useEffect } from "react";
-import { getUsers } from "./services/user.service";
+import { useState } from "react";
+import Sidebar from "./components/sidebar/Sidebar";
 
 function App() {
-  useEffect(() => {
-    const loadUsers = async () => {
-      try {
-        const data = await getUsers();
+  const [selectedUser, setSelectedUser] = useState(null);
 
-        console.log("Users:", data);
-      } catch (error) {
-        console.log(
-          "Failed to fetch users:",
-          error.response?.data || error.message,
-        );
-      }
-    };
+  return (
+    <div style={{ display: "flex" }}>
+      <Sidebar onSelectUser={setSelectedUser} />
 
-    loadUsers();
-  }, []);
-
-  return <h1>Chat App</h1>;
+      <main style={{ padding: "30px" }}>
+        {selectedUser ? (
+          <h2>Chat with {selectedUser.name}</h2>
+        ) : (
+          <h2>Select a user</h2>
+        )}
+      </main>
+    </div>
+  );
 }
 
 export default App;
